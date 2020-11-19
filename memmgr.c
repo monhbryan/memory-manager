@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
+#include <stdbool.h>
 #define ARGC_ERROR 1
 #define FILE_ERROR 2
 #define BUFLEN 256
@@ -36,42 +36,76 @@ int main(int argc, const char* argv[]) {
   FILE* fcorr = fopen("correct.txt", "r");     // contains the logical and physical address, and its value
   if (fcorr == NULL) { fprintf(stderr, "Could not open file: 'correct.txt'\n");  exit(FILE_ERROR);  }
 
+  /*FILE* fbin = fopen("BACKING_STORE.bin", "rb");
+  if (fbin == NULL) { fprintf(stderr, "Could not open file: 'BACKING_STORE.bin'\n");  exit(FILE_ERROR);  }
+*/
   char buf[BUFLEN];
   unsigned   page, offset, physical_add, frame = 0;
   unsigned   logic_add;                  // read from file address.txt
   unsigned   virt_add, phys_add, value;  // read from file correct.txt
-
+  unsigned   checkedValue;               // read from file BACKING_STORE.bin
+  
   printf("ONLY READ FIRST 20 entries -- TODO: change to read all entries\n\n");
 
   // not quite correct -- should search page table before creating a new entry
       //   e.g., address # 25 from addresses.txt will fail the assertion
       // TODO:  add page table code
+  unsigned pageList[256];
+  bool pageConsult = false;
       // TODO:  add TLB code
-  while (frame < 20) {
-
-    fscanf(fcorr, "%s %s %d %s %s %d %s %d", buf, buf, &virt_add,
-           buf, buf, &phys_add, buf, &value);  // read from file correct.txt
-
+  unsigned TLB[16]; // Stores physical to check for duplicate values
+  unsigned placeholder;
+  while (frame < 100) {
+    fscanf(fcorr, "%s %s %d %s %s %d %s %d", buf, buf, &virt_add, buf, buf, &phys_add, buf, &value);  // read from file correct.txt
     fscanf(fadd, "%d", &logic_add);  // read from file address.txt
     page   = getpage(  logic_add);
     offset = getoffset(logic_add);
     
+    // Check page number with TLB
+    /*
+    placeholder = -1;
+    for(int i = 0 ; i<16 ; i++){
+      if(TLB[i] == page){
+        placeholder = i;
+      }
+    }*/
+
+    // If hit, frame number is obtained from TLB
+
+    // If TLB miss, page table consulted
+    if(pageList[page] != 0){
+      pageConsult = true;
+    }
+    // If page table consulted, frame number is obtained from the page table.
+    if(pageConsult){
+      physical_add = pageList[page] * FRAME_SIZE + offset;
+      frame++;
+    }
+    else{
     physical_add = frame++ * FRAME_SIZE + offset;
-    
     assert(physical_add == phys_add);
-    
+    pageList[page] = frame;
+    TLB[frame] = page;
+    }
     // todo: read BINARY_STORE and confirm value matches read value from correct.txt
-    
-    printf("logical: %5u (page: %3u, offset: %3u) ---> physical: %5u -- passed\n", logic_add, page, offset, physical_add);
+    /*fscanf(fbin, offset, SEEK_SET);
+    fscanf(fbin, "%u" ,checkedValue);
+    if(checkedValue == phys_add){
+      fprintf("Correct Value Obtained %u\n", checkedValue);
+    }*/
+
+    printf("frame: %d logical: %5u (page: %3u, offset: %3u) ---> physical: %5u -- passed\n", frame, logic_add, page, offset, physical_add);
     if (frame % 5 == 0) { printf("\n"); }
+    
   }
   fclose(fcorr);
   fclose(fadd);
+  //fclose(fbin);
   
   printf("ONLY READ FIRST 20 entries -- TODO: change to read all entries\n\n");
   
   printf("ALL logical ---> physical assertions PASSED!\n");
-  printf("!!! This doesn't work passed entry 24 in correct.txt, because of a duplicate page table entry\n");
+  printf("!!! This doesn't work pass entry 24 in correct.txt, because of a duplicate page table entry\n");
   printf("--- you have to implement the PTE and TLB part of this code\n");
 
 //  printf("NOT CORRECT -- ONLY READ FIRST 20 ENTRIES... TODO: MAKE IT READ ALL ENTRIES\n");
