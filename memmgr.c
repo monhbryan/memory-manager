@@ -51,9 +51,11 @@ int main(int argc, const char* argv[]) {
   // not quite correct -- should search page table before creating a new entry
       //   e.g., address # 25 from addresses.txt will fail the assertion
       // TODO:  add page table code
+  unsigned phys_memory[256];
   unsigned pageList[256];
   for(int i =0; i<256; i++){
     pageList[i] = -99999999; // Not null because of NULL == 0
+    phys_memory[i] = 0;
   }
       // TODO:  add TLB code
   unsigned TLB[16]; // Stores physical to check for duplicate values
@@ -64,7 +66,6 @@ int main(int argc, const char* argv[]) {
     TLBframe[i] = -99999999;
   }
   unsigned placeholder;
-  unsigned phys_memory[256];
   bool hitTLB = false;
   
   while (feof(fadd) == 0) { // returns non-zero if EOF is found
@@ -88,9 +89,7 @@ int main(int argc, const char* argv[]) {
     if(hitTLB == true){
       TLB_hit++;
       physical_add = TLBframe[placeholder] * FRAME_SIZE + offset;
-      //getpage_offset(TLB[placeholder]);
-      //printf("PhysicalAdd = %d | phys_add = %d\n",physical_add, phys_add);
-      assert(physical_add == phys_add);
+      
     }
     // If TLB miss, page table consulted
     else{
@@ -100,29 +99,27 @@ int main(int argc, const char* argv[]) {
         physical_add = pageList[page] * FRAME_SIZE + offset;
         TLB[page%16] = page;
         TLBframe[page%16] = pageList[page];
-        assert(physical_add ==phys_add);
       }
       else{
       //printf("-----------Page Fault %d------------\n",frame+1);
         page_fault++;
-        fseek(fbin, logic_add,SEEK_SET);
-        //printf("\nFRAME#: %d| PAGE #: %d | OFFSET: %d\n",frame, page,offset);
-        char* checkedValue;
-        fread(&checkedValue,sizeof(char), 1,fbin);
-        //getpage_offset(checkedValue);
-        phys_memory[getpage(checkedValue)] = (int)checkedValue;
 
-        //printf("PHYSMEM: %d\n", phys_memory[getpage((int)checkedValue)]);
+        //Checks binary file
+        fseek(fbin, logic_add,SEEK_SET);
+        char checkedValue;
+        fread(&checkedValue,sizeof(char), 1,fbin);
+        //Stores value at logical address value file into physical memory
+        phys_memory[frame] = (int)(checkedValue);
 
         pageList[page] = frame;
         TLB[page%16] = page;
         TLBframe[page%16] = frame;
         physical_add = frame++ * FRAME_SIZE + offset;
-        //printf("PhysicalAdd = %d | phys_add = %d\n",physical_add, phys_add);
-        assert(physical_add == phys_add);
       }
     }
-    printf("frame: %d logical: %5u (page: %3u, offset: %3u) ---> physical: %5u -- passed\n", frame, logic_add, page, offset, physical_add);
+    assert(physical_add == phys_add);
+    printf("%d | %d\n", phys_memory[frame-1], value);
+    printf("frame: %d logical: %5u (page: %3u, offset: %3u) ---> physical: %5u -- passed | value: %d\n", frame, logic_add, page, offset, physical_add, phys_memory[frame-1]);
     if (frame % 5 == 0) { printf("\n"); }
     
   }
